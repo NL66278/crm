@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record
+        id="action_membership"
+        model="ir.actions.act_window"
+        >
+        <field name="view_mode">tree,form</field>
+        <field name="res_model">res.partner</field>
+        <field name="name">Members</field>
+        <field name="domain">[('membership','=',True)]</field>
+    </record>
+
+    <menuitem
+        id="menu_membership"
+        action="action_membership"
+        name="Members"
+        parent="partner_noncommercial.menu_partner"
+        sequence="71"
+        />
+
+</odoo>
