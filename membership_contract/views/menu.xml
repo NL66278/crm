@@ -19,4 +19,20 @@
         sequence="71"
         />
 
+    <record id="res_partner_action_for_membership" model="ir.actions.server">
+        <field name="name">Recompute membership</field>
+        <field name="model_id" ref="model_res_partner"/>
+        <field name="code">
+            env['res.partner'].cron_compute_membership()
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_recompute_membership"
+        action="res_partner_action_for_membership"
+        name="Recompute membership"
+        parent="partner_noncommercial.menu_partner"
+        sequence="73"
+        />
+
 </odoo>

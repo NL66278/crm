@@ -15,6 +15,7 @@
         'web_m2x_options',
     ],
     'data': [
+        'data/membership_cron.xml',
         'views/product_template.xml',
         'views/res_partner.xml',
         'views/menu.xml',

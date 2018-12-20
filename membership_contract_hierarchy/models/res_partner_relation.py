@@ -24,7 +24,7 @@ class ResPartnerRelation(models.Model):
     @api.model
     def create(self, vals):
         result = super(ResPartnerRelation, self).create(vals)
-        partners = result._get_partners_affected()
+        partners = result._get_partners_affected(vals)
         for partner in partners:
             partner._compute_membership()
         return result

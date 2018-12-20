@@ -28,6 +28,12 @@ msgid "Members"
 msgstr ""
 
 #. module: membership_contract
+#: model:ir.actions.act_window,name:membership_contract.res_partner_action_for_membership
+#: model:ir.ui.menu,name:membership_contract.menu_recompute_membership"
+msgid "Recompute membership"
+msgstr ""
+
+#. module: membership_contract
 #: model:ir.ui.view,arch_db:membership_contract.res_partner_membership_form
 msgid "Membership"
 msgstr ""

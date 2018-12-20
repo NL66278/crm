@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2018 Therp BV <https://therp.nl>.
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+# pylint: disable=protected-access
 from odoo.tests import common
 
 
@@ -100,6 +101,7 @@ class TestMembership(common.SavepointCase):
         self.assertEqual(
             self.partner_jan.membership_line_ids[0],
             self.line_personal_membership)
+        self.partner_jan._compute_membership()
         self.assertTrue(self.partner_jan.membership)
 
     def test_product_change(self):
@@ -123,4 +125,5 @@ class TestMembership(common.SavepointCase):
         self.contract_jan.write({'date_end': '2017-12-31'})
         self.assertEqual(
             self.line_personal_membership.date_end, '2017-12-31')
+        self.partner_jan._compute_membership()
         self.assertFalse(self.partner_jan.membership)

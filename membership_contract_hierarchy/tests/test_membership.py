@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2018 Therp BV <https://therp.nl>.
-# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
+# pylint: disable=protected-access
 from odoo.addons.membership_contract.tests import test_membership
 
 
@@ -46,6 +47,7 @@ class TestMembershipHierarchy(test_membership.TestMembership):
         self.assertEqual(
             self.partner_club.membership_line_ids[0],
             self.line_club_membership)
+        self.partner_club._compute_membership()
         self.assertTrue(self.partner_club.membership)
         # Check wether hierarchy properly created.
         self.assertEqual(
@@ -62,11 +64,13 @@ class TestMembershipHierarchy(test_membership.TestMembership):
         # First change product to not imply membership.
         self.product_club_membership.write({'membership': False})
         self.assertFalse(self.line_club_membership.membership)
+        self.partner_club._compute_membership()
         self.assertFalse(self.partner_club.membership)
         self.assertFalse(self.partner_groningen_club.membership)
         # And back to membership.
         self.product_club_membership.write({'membership': True})
         self.assertTrue(self.line_club_membership.membership)
+        self.partner_club._compute_membership()
         self.assertTrue(self.partner_club.membership)
         self.assertTrue(self.partner_groningen_club.membership)
 
@@ -75,5 +79,6 @@ class TestMembershipHierarchy(test_membership.TestMembership):
         self.contract_club.write({'date_end': '2017-12-31'})
         self.assertEqual(
             self.line_club_membership.date_end, '2017-12-31')
+        self.partner_club._compute_membership()
         self.assertFalse(self.partner_club.membership)
         self.assertFalse(self.partner_groningen_club.membership)
