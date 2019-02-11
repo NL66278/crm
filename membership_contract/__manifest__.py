@@ -16,6 +16,7 @@
     ],
     'data': [
         'data/membership_cron.xml',
+        'demo/product.xml',
         'views/product_template.xml',
         'views/res_partner.xml',
         'views/menu.xml',
