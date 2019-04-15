@@ -7,25 +7,29 @@ from odoo import _, api, fields, models
 
 
 MEMBERSHIP_ANALYSIS_STATEMENT = """\
-WITH membership_analysis AS (
-SELECT
-     rp.id as id,
-     associate_member,
-     COALESCE(rp.membership, false) AS is_member,
-     COALESCE(cl.membership, false) AS should_be_member
- FROM
-     res_partner rp
- LEFT OUTER JOIN
-     account_analytic_account c ON rp.id = c.partner_id
- LEFT OUTER JOIN
-     account_analytic_invoice_line cl ON c.id = cl.analytic_account_id AND
-     cl.membership
+WITH contract_members AS (
+ SELECT
+     aaa.partner_id, aail.membership
+ FROM account_analytic_account aaa
+ INNER JOIN account_analytic_invoice_line aail
+     ON aaa.id = aail.analytic_account_id
+    AND aail.membership
  WHERE
-     (c.date_start IS NULL OR c.date_start <= CURRENT_DATE) AND
-     (c.date_end IS NULL OR c.date_end >= CURRENT_DATE)
- )
- SELECT id FROM membership_analysis
- WHERE is_member <> should_be_member AND associate_member IS NULL
+     (aaa.date_start IS NULL OR aaa.date_start <= CURRENT_DATE) AND
+     (aaa.date_end IS NULL OR aaa.date_end >= CURRENT_DATE)
+),
+ direct_members AS (
+ SELECT rp.id as partner_id, rp.membership
+ FROM res_partner rp
+ WHERE rp.membership AND associate_member IS NULL
+)
+ SELECT
+     COALESCE(cm.partner_id, dm.partner_id) AS partner_id
+ FROM contract_members cm
+ FULL OUTER JOIN direct_members dm
+     ON cm.partner_id = dm.partner_id
+ WHERE (cm.membership IS NULL AND NOT dm.membership IS NULL)
+    OR (dm.membership IS NULL AND NOT cm.membership IS NULL)
 """
 
 _logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
