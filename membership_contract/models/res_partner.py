@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017-2019 Therp BV <https://therp.nl>.
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
-# pylint: disable=protected-access
+# pylint: disable=missing-docstring,protected-access
 import logging
 from odoo import _, api, fields, models
 
@@ -76,7 +76,7 @@ class ResPartner(models.Model):
                 # Check wether line belongs to active contract
                 contract = line.analytic_account_id
                 if ((contract.date_start and contract.date_start > today) or
-                        (contract.date_end and contract.date_end < today)):
+                        (contract.date_end and contract.date_end <= today)):
                     continue  # not active contract
                 membership = True
                 break

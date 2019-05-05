@@ -1,11 +1,19 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 Therp BV <https://therp.nl>.
-# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+# Copyright 2018-2019 Therp BV <https://therp.nl>.
+# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
+# pylint: disable=missing-docstring,protected-access
 from odoo import api, models
 
 
 class AccountAnalyticAccount(models.Model):
     _inherit = 'account.analytic.account'
+
+    @api.model
+    def create(self, vals):
+        result = super(AccountAnalyticAccount, self).create(vals)
+        if result.recurring_invoices:  # Only for contracts.
+            result.partner_id._compute_membership()
+        return result
 
     @api.multi
     def write(self, vals):
