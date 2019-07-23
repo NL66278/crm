@@ -68,7 +68,7 @@ class ResPartner(models.Model):
         with members determined here. Therefore membership will not be
         updated if member through association.
         """
-        today = fields.Date.today()
+        today = fields.Date.context_today(self)
         for this in self:
             save_membership = this.membership
             membership = False
