@@ -46,8 +46,9 @@
                     </group>
                     <group
                         colspan="6" col="4"
-                        attrs="{'invisible': [('associate_member','!=',False)]}"
+                        attrs="{'invisible': [('personal_member','=',False)]}"
                         >
+                        <field name="personal_member" />
                         <separator
                             string="Membership contract lines"
                             colspan="4"
