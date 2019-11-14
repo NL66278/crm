@@ -19,32 +19,25 @@ class ResPartnerRelationType(models.Model):
     _inherit = "res.partner.relation.type"
 
     @api.multi
-    def _get_partners_affected(self):
-        """Affected partners are those with a changed or unlinked type."""
-        self.ensure_one()
-        partner_model = self.env["res.partner"]
-        return partner_model.search([("relation_all_ids.type_id", "=", self.id)])
-
-    @api.multi
     def write(self, vals):
         """Membership only changes when hierarchy changes."""
-        partners = self.env["res.partner"].browse([])
+        recompute_membership = False
         for this in self:
             if "hierarchy" in vals and vals["hierarchy"] != this.hierarchy:
-                partners = partners | this._get_partners_affected()
+                recompute_membership = True
         result = super(ResPartnerRelationType, self).write(vals)
-        for partner in partners:
-            partner._compute_membership()
+        if recompute_membership:
+            self.env["res.partner"].cron_compute_membership()
         return result
 
     @api.multi
     def unlink(self):
         """Unlink might mean loss of associated membership."""
-        partners = self.env["res.partner"].browse([])
+        recompute_membership = False
         for this in self:
             if this.hierarchy in ("left", "right"):
-                partners = partners | this._get_partners_affected()
+                recompute_membership = True
         result = super(ResPartnerRelationType, self).unlink()
-        for partner in partners:
-            partner._compute_membership()
+        if recompute_membership:
+            self.env["res.partner"].cron_compute_membership()
         return result

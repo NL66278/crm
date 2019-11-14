@@ -1,8 +1,46 @@
 # -*- coding: utf-8 -*-
-# Copyright 2017-2018 Therp BV <https://therp.nl>.
+# Copyright 2017-2019 Therp BV <https://therp.nl>.
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 # pylint: disable=protected-access
 from odoo import api, models
+
+
+# Statement to determine wether partner should be associate member.
+DETERMINE_ASSOCIATE_MEMBERSHIP_STATEMENT = """\
+SELECT partner_above_id
+ FROM res_partner_relation_hierarchy h
+ JOIN res_partner above ON h.partner_above_id = above.id
+ WHERE h.partner_below_id = %(partner_id)s
+   AND above.direct_member
+"""
+
+
+MEMBERSHIP_SHOULD_HAVE_STATEMENT = """\
+-- Should be member according to hierarchy
+SELECT
+    h.partner_below_id
+ FROM res_partner_relation_hierarchy h
+ JOIN res_partner above ON h.partner_above_id = above.id
+ JOIN res_partner below ON h.partner_below_id = below.id
+ WHERE above.membership
+   AND (below.associate_member IS NULL OR NOT below.membership)
+"""
+
+
+MEMBERSHIP_SHOULD_NOT_HAVE_STATEMENT = """\
+-- Should not be member according to hierarchy
+WITH members_above AS (
+ SELECT
+    h.partner_above_id
+ FROM res_partner_relation_hierarchy h
+ JOIN res_partner above ON h.partner_above_id = above.id
+ WHERE above.membership
+)
+SELECT p.id
+ FROM res_partner p
+ WHERE NOT p.associate_member IS NULL
+   AND p.associate_member NOT IN (SELECT partner_above_id FROM members_above)
+"""
 
 
 class ResPartner(models.Model):
@@ -21,26 +59,38 @@ class ResPartner(models.Model):
                 partner_below.partner_below_id._compute_membership()
 
     @api.multi
-    def _is_member(self):
+    def _is_member(self, vals):
         """Check associate membership.
 
         Can exist alongside personal membership.
         """
         self.ensure_one()
-        self.env.invalidate_all()  # Prevent stale partner_above_ids.
-        super_member = super(ResPartner, self)._is_member()
-        # Check all partners above us for membership.
-        for partner_above in self.partner_above_ids:
-            associate = partner_above.partner_above_id
-            if not associate.membership:
-                continue
-            # We have a member above us, so we are member too.
-            # Only write real changes
-            if not self.membership or self.associate_member != associate:
-                super(ResPartner, self).write(
-                    {"membership": True, "associate_member": associate.id}
-                )
+        super_member = super(ResPartner, self)._is_member(vals)
+        self.env.cr.execute(
+            DETERMINE_ASSOCIATE_MEMBERSHIP_STATEMENT, {"partner_id": self.id}
+        )
+        # resultset should contain zero rows (no member above) or one.
+        try:
+            row = self.env.cr.fetchone()
+            associate_member_id = row[0] if row else False
+        except Exception:  # pylint: disable=broad-except
+            associate_member_id = False
+        # Only write real changes
+        if associate_member_id != self.associate_member.id:
+            vals["associate_member"] = associate_member_id
+        if associate_member_id:
             return True
         # If we get here, we are not member through hierarchy.
-        super(ResPartner, self).write({"associate_member": False})
         return super_member
+
+    @api.model
+    def cron_compute_membership(self):
+        """Recompute membership also for associate members."""
+        # First recompute direct members.
+        super(ResPartner, self).cron_compute_membership()
+        # Check for new associate members.
+        self.env.cr.execute(MEMBERSHIP_SHOULD_HAVE_STATEMENT)
+        self.recompute_partners_from_cursor()
+        # Check for deprecated associate members.
+        self.env.cr.execute(MEMBERSHIP_SHOULD_NOT_HAVE_STATEMENT)
+        self.recompute_partners_from_cursor()

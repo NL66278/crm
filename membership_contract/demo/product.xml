@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-    <record id="product_personal_membership" model="product.product">
+    <record id="product_direct_member" model="product.product">
         <field name="default_code">PERS</field>
         <field name="name">Personal membership</field>
         <field name="type">service</field>
