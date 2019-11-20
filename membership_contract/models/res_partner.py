@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017-2019 Therp BV <https://therp.nl>.
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=missing-docstring,protected-access,invalid-name
 import logging
 
-from odoo import _, api, fields, models
+from odoo import _, api, fields, models, registry
 
 
 # Statements to get rid of unwanted NULL values
@@ -142,22 +142,70 @@ class ResPartner(models.Model):
 
     @api.model
     def cron_compute_membership(self):
-        """Recompute membership for all direct members."""
-        # Start off by getting rid of NULL values
-        self.env.cr.execute(NO_NULL_MEMBERSHIP_STATEMENT)
-        self.env.cr.execute(NO_NULL_DIRECT_MEMBER_STATEMENT)
-        # Mark all members with no associate member as direct member.
-        self.env.cr.execute(DIRECT_MEMBERSHIP_STATEMENT)
-        # Now handle those that should be direct member
-        self.env.cr.execute(DIRECT_MEMBER_SHOULD_BE_STATEMENT)
-        self.recompute_partners_from_cursor()
-        # Now handle those that should no longer be direct member
-        self.env.cr.execute(DIRECT_MEMBER_SHOULD_NOT_BE_STATEMENT)
-        self.recompute_partners_from_cursor()
+        """Recompute membership for all direct members.
+
+        We create a separate cursor to commit each step separately.
+        """
+        # Prevent recursive call.
+        if self.env.context.get("in_cron_compute_membership", False):
+            return
+        self = self.with_context(in_cron_compute_membership=True)
+        self._recompute_membership()
 
     @api.model
-    def recompute_partners_from_cursor(self):
+    def _recompute_membership(self):
+        """Recompute membership for all direct members.
+
+        We create a separate cursor to commit each step separately.
+        """
+        # Prevent recursive call.
+        if self.env.context.get("in_cron_compute_membership", False):
+            return
+        self = self.with_context(in_cron_compute_membership=True)
+        # Make our own cursor
+        new_cr = registry(self._cr.dbname).cursor()
+        # Start off by getting rid of NULL values
+        new_cr.execute(NO_NULL_MEMBERSHIP_STATEMENT)
+        new_cr.commit()
+        new_cr.execute(NO_NULL_DIRECT_MEMBER_STATEMENT)
+        new_cr.commit()
+        # Mark all members with no associate member as direct member.
+        new_cr.execute(DIRECT_MEMBERSHIP_STATEMENT)
+        new_cr.commit()
+        # Now handle those that should be direct member
+        self.env.cr.execute(DIRECT_MEMBER_SHOULD_BE_STATEMENT)
+        self._recompute_partners_from_cursor()
+        # Now handle those that should no longer be direct member
+        self.env.cr.execute(DIRECT_MEMBER_SHOULD_NOT_BE_STATEMENT)
+        self._recompute_partners_from_cursor()
+
+    @api.model
+    def _recompute_partners_from_cursor(self):
         """Recompute membership for all direct members."""
-        partner_ids = [rec[0] for rec in self.env.cr.fetchall()]
-        partners = self.browse(partner_ids)
+        max_recompute = 512
+        cr = self.env.cr
+        partner_ids = [rec[0] for rec in cr.fetchall()]
+        if not partner_ids:
+            _logger.debug(
+                _("Found no records for recompute membership for query %s."), cr.query
+            )
+            return
+        records_found = len(partner_ids)
+        if records_found > max_recompute:
+            _logger.info(
+                _(
+                    "Found %d records for recompute membership for query %s."
+                    "WIll recompute %d records."
+                ),
+                records_found,
+                cr.query,
+                max_recompute,
+            )
+        else:
+            _logger.debug(
+                _("Found %d records for recompute membership for query %s."),
+                records_found,
+                cr.query,
+            )
+        partners = self.browse(partner_ids[:max_recompute])
         partners._compute_membership()

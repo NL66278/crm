@@ -84,13 +84,13 @@ class ResPartner(models.Model):
         return super_member
 
     @api.model
-    def cron_compute_membership(self):
+    def _recompute_membership(self):
         """Recompute membership also for associate members."""
         # First recompute direct members.
         super(ResPartner, self).cron_compute_membership()
         # Check for new associate members.
         self.env.cr.execute(MEMBERSHIP_SHOULD_HAVE_STATEMENT)
-        self.recompute_partners_from_cursor()
+        self._recompute_partners_from_cursor()
         # Check for deprecated associate members.
         self.env.cr.execute(MEMBERSHIP_SHOULD_NOT_HAVE_STATEMENT)
-        self.recompute_partners_from_cursor()
+        self._recompute_partners_from_cursor()

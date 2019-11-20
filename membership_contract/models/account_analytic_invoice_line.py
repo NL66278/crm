@@ -5,9 +5,9 @@ from odoo import api, fields, models
 
 
 class AccountAnalyticInvoiceLine(models.Model):
-    _inherit = 'account.analytic.invoice.line'
+    _inherit = "account.analytic.invoice.line"
 
-    membership = fields.Boolean(string='Membership product line')
+    membership = fields.Boolean(string="Membership product line")
 
     @api.multi
     def set_membership(self):
@@ -18,7 +18,8 @@ class AccountAnalyticInvoiceLine(models.Model):
         for this in self:
             if this.membership != this.product_id.membership:
                 super(AccountAnalyticInvoiceLine, this).write(
-                    {'membership': this.product_id.membership})
+                    {"membership": this.product_id.membership}
+                )
 
     @api.model
     def create(self, vals):

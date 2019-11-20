@@ -5,9 +5,9 @@ from odoo import api, fields, models
 
 
 class ProductTemplate(models.Model):
-    _inherit = 'product.template'
+    _inherit = "product.template"
 
-    membership = fields.Boolean(string='Product is a membership?')
+    membership = fields.Boolean(string="Product is a membership?")
 
     @api.multi
     def membership_change_trigger(self):
@@ -15,17 +15,16 @@ class ProductTemplate(models.Model):
 
         Make sure membership correctly set on contract lines.
         """
-        line_model = self.env['account.analytic.invoice.line']
+        line_model = self.env["account.analytic.invoice.line"]
         for this in self:
-            lines = line_model.search([
-                ('product_id.product_tmpl_id', '=', this.id)])
+            lines = line_model.search([("product_id.product_tmpl_id", "=", this.id)])
             for line in lines:
                 if line.membership != this.membership:
-                    line.write({'membership': this.membership})
+                    line.write({"membership": this.membership})
 
     @api.multi
     def write(self, vals):
-        if 'membership' not in vals:
+        if "membership" not in vals:
             return super(ProductTemplate, self).write(vals)
         for this in self:
             save_membership = this.membership

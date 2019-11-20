@@ -6,7 +6,7 @@ from odoo import api, models
 
 
 class AccountAnalyticAccount(models.Model):
-    _inherit = 'account.analytic.account'
+    _inherit = "account.analytic.account"
 
     @api.model
     def create(self, vals):
@@ -18,7 +18,7 @@ class AccountAnalyticAccount(models.Model):
     @api.multi
     def write(self, vals):
         result = super(AccountAnalyticAccount, self).write(vals)
-        if 'date_start' in vals or 'date_end' in vals:
+        if "date_start" in vals or "date_end" in vals:
             for this in self:
                 this.partner_id._compute_membership()
         return result
