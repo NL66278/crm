@@ -37,6 +37,7 @@ SELECT COUNT(*)
 
 # Statement to find all partners that should be direct_member, but are not.
 DIRECT_MEMBER_SHOULD_BE_STATEMENT = """\
+-- Partner with current contract should be direct member.
 WITH contract_members AS (
  SELECT
      aaa.partner_id, aail.membership
@@ -56,6 +57,7 @@ WITH contract_members AS (
 
 # Statement to find all partners that should not be direct_member, but are.
 DIRECT_MEMBER_SHOULD_NOT_BE_STATEMENT = """\
+-- Partner without current contract should NOT be direct member.
 WITH contract_members AS (
  SELECT
      aaa.partner_id, aail.membership
@@ -146,10 +148,6 @@ class ResPartner(models.Model):
 
         We create a separate cursor to commit each step separately.
         """
-        # Prevent recursive call.
-        if self.env.context.get("in_cron_compute_membership", False):
-            return
-        self = self.with_context(in_cron_compute_membership=True)
         self._recompute_membership()
 
     @api.model
@@ -158,10 +156,6 @@ class ResPartner(models.Model):
 
         We create a separate cursor to commit each step separately.
         """
-        # Prevent recursive call.
-        if self.env.context.get("in_cron_compute_membership", False):
-            return
-        self = self.with_context(in_cron_compute_membership=True)
         # Make our own cursor
         new_cr = registry(self._cr.dbname).cursor()
         # Start off by getting rid of NULL values
@@ -172,6 +166,7 @@ class ResPartner(models.Model):
         # Mark all members with no associate member as direct member.
         new_cr.execute(DIRECT_MEMBERSHIP_STATEMENT)
         new_cr.commit()
+        new_cr.close()
         # Now handle those that should be direct member
         self.env.cr.execute(DIRECT_MEMBER_SHOULD_BE_STATEMENT)
         self._recompute_partners_from_cursor()
@@ -182,30 +177,31 @@ class ResPartner(models.Model):
     @api.model
     def _recompute_partners_from_cursor(self):
         """Recompute membership for all direct members."""
-        max_recompute = 512
+        max_recompute = 256
         cr = self.env.cr
+        query = cr.query  # Save as logging translation will result in new queries.
         partner_ids = [rec[0] for rec in cr.fetchall()]
         if not partner_ids:
             _logger.debug(
-                _("Found no records for recompute membership for query %s."), cr.query
+                _("Found no records for recompute membership for query:\n%s."), query
             )
             return
         records_found = len(partner_ids)
         if records_found > max_recompute:
             _logger.info(
                 _(
-                    "Found %d records for recompute membership for query %s."
+                    "Found %d records for recompute membership for query:\n%s."
                     "WIll recompute %d records."
                 ),
                 records_found,
-                cr.query,
+                query,
                 max_recompute,
             )
         else:
             _logger.debug(
-                _("Found %d records for recompute membership for query %s."),
+                _("Found %d records for recompute membership for query:\n%s."),
                 records_found,
-                cr.query,
+                query,
             )
         partners = self.browse(partner_ids[:max_recompute])
         partners._compute_membership()

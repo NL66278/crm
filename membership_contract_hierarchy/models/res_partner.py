@@ -87,7 +87,7 @@ class ResPartner(models.Model):
     def _recompute_membership(self):
         """Recompute membership also for associate members."""
         # First recompute direct members.
-        super(ResPartner, self).cron_compute_membership()
+        super(ResPartner, self)._recompute_membership()
         # Check for new associate members.
         self.env.cr.execute(MEMBERSHIP_SHOULD_HAVE_STATEMENT)
         self._recompute_partners_from_cursor()
