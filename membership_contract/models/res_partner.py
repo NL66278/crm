@@ -111,19 +111,33 @@ class ResPartner(models.Model):
         to underlying methods that will enable those methods to add their
         own content.
         """
+        records_todo = len(self)
+        new_member_count = 0
+        removed_member_count = 0
+        if records_todo > 0:
+            _logger.info(_("Recomputing membership for %d partners"), records_todo)
         for this in self:
+            _logger.debug(_("Recomputing membership for %s"), this.display_name)
             vals = {}
             membership = this._is_member(vals)
             if membership != this.membership:
                 if membership:
+                    new_member_count += 1
                     _logger.info(_("%s is now a member"), this.display_name)
                 else:
+                    removed_member_count += 1
                     _logger.info(_("%s is no longer a member"), this.display_name)
                 vals["membership"] = membership
             if vals:
                 this.write(vals)
                 if "membership" in vals:
                     this.membership_change_trigger()
+        if records_todo > 0:
+            _logger.info(
+                _("Recomputing membership added %d members, removed %d"),
+                new_member_count,
+                removed_member_count,
+            )
 
     @api.multi
     def _is_member(self, vals):
