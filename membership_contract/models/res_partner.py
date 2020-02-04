@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2017-2019 Therp BV <https://therp.nl>.
+# Copyright 2017-2020 Therp BV <https://therp.nl>.
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 # pylint: disable=missing-docstring,protected-access,invalid-name
 import logging
@@ -15,13 +15,11 @@ NO_NULL_DIRECT_MEMBER_STATEMENT = """\
 UPDATE res_partner SET direct_member = false WHERE direct_member IS NULL
 """
 
-
-# Mark all members with no associate member as direct member.
-DIRECT_MEMBERSHIP_STATEMENT = """\
-UPDATE res_partner SET direct_member = true
- WHERE membership AND associate_member IS NULL
+# Correct members that have no direct or associate membership.
+MEMBERSHIP_SHOULD_NOT_HAVE_STATEMENT = """\
+UPDATE res_partner SET membership = false
+ WHERE not direct_member AND associate_member IS NULL AND membership
 """
-
 
 # Statement to determine wether a particular partner should be direct member.
 DETERMINE_PARTNER_MEMBERSHIP_STATEMENT = """\
@@ -33,7 +31,6 @@ SELECT COUNT(*)
    AND (c.date_start IS NULL OR c.date_start <= current_date)
    AND (c.date_end IS NULL OR c.date_end >= current_date)
 """
-
 
 # Statement to find all partners that should be direct_member, but are not.
 DIRECT_MEMBER_SHOULD_BE_STATEMENT = """\
@@ -53,7 +50,6 @@ WITH contract_members AS (
  WHERE (NOT membership OR NOT direct_member)
    AND id IN (SELECT partner_id FROM contract_members)
 """
-
 
 # Statement to find all partners that should not be direct_member, but are.
 DIRECT_MEMBER_SHOULD_NOT_BE_STATEMENT = """\
@@ -177,8 +173,9 @@ class ResPartner(models.Model):
         new_cr.commit()
         new_cr.execute(NO_NULL_DIRECT_MEMBER_STATEMENT)
         new_cr.commit()
-        # Mark all members with no associate member as direct member.
-        new_cr.execute(DIRECT_MEMBERSHIP_STATEMENT)
+        # Members that are not direct_member, and not through associate,
+        # should not be member.
+        new_cr.execute(MEMBERSHIP_SHOULD_NOT_HAVE_STATEMENT)
         new_cr.commit()
         new_cr.close()
         # Now handle those that should be direct member
@@ -217,5 +214,37 @@ class ResPartner(models.Model):
                 records_found,
                 query,
             )
-        partners = self.browse(partner_ids[:max_recompute])
-        partners._compute_membership()
+        self._recompute_partners_one_by_one(partner_ids[:max_recompute])
+
+    @api.model
+    def _recompute_partners_one_by_one(self, partner_ids):
+        """Recompute members one by one, in separate cursor.
+
+        Recomputing partners one by one will prevent problems where the whole
+        update is cancelled and rolled back, because of problems with a single
+        partner having been changed in another job/thread, or because of a locking
+        problem on a single partner.
+        to prevent a problem on
+        """
+        new_cr = registry(self._cr.dbname).cursor()
+        new_self = self.with_env(self.env(cr=new_cr))
+        errors = 0
+        for partner_id in partner_ids:
+            partner = new_self.browse([partner_id])
+            try:
+                partner._compute_membership()
+                new_cr.commit()
+            except Exception:  # pylint: disable=broad-except
+                _logger.exception(
+                    _("Error updating membership voor partner %s with id %d."),
+                    partner.display_name,
+                    partner_id,
+                )
+                new_cr.rollback()
+                errors += 1
+                if errors >= 16:
+                    _logger.error(
+                        _("Too many errors in updating partners, cancelling operation")
+                    )
+                    break
+        new_cr.close()
